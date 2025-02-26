@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>声调曲线生成器</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        #input-area { margin-bottom: 30px; }
+        #input-text { width: 80%; padding: 12px; font-size: 16px; margin-right: 10px; }
+        button { padding: 12px 24px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .example { color: #666; margin: 15px 0; }
+        #chart { margin-top: 30px; height: 500px; }
+    </style>
+</head>
+<body>
+    <h1>汉字声调可视化工具</h1>
+    <div id="input-area">
+        <input type="text" id="input-text" placeholder="请输入汉字和声调（例：妈1妈0）">
+        <button onclick="generateChart()">生成曲线图</button>
+        <div class="example">示例格式：<br>1. 普通+轻声：妈1妈0<br>2. 复杂示例：苹2果0 椅3子0 衣1服0</div>
+    </div>
+    <div id="chart"></div>
+    <script>
+        const toneValues = { 1: [5,5,5,5,5], 2: [3,3.5,4,4.5,5], 3: [2,1,1,2,4], 4: [5,4,3,2,1], 0: [] };
+        function generateChart() {
+            const input = document.getElementById('input-text').value.trim();
+            if (!input) { alert("请输入有效内容"); return; }
+            const items = [];
+            const regex = /(\p{Script=Han})([0-4])/gu;
+            let match;
+            let lastToneValue = null;
+            while ((match = regex.exec(input)) !== null) {
+                const currentTone = match[2];
+                const isLightTone = currentTone === '0';
+                if (isLightTone) {
+                    if (!lastToneValue) { alert("轻声必须出现在有声调的字之后"); return; }
+                    items.push({ char: match[1], tone: currentTone, values: [lastToneValue], isLight: true });
+                } else {
+                    const values = toneValues[currentTone];
+                    lastToneValue = values[values.length - 1];
+                    items.push({ char: match[1], tone: currentTone, values: values, isLight: false });
+                }
+            }
+            if (items.length === 0) { alert("输入格式错误，请使用'汉字+数字'格式\n例：妈1妈0"); return; }
+            const mainTraces = [];
+            const lightTraces = [];
+            const xLabels = [];
+            let xPos = 0;
+            items.forEach((item, index) => {
+                xLabels.push(item.char);
+                if (item.isLight) {
+                    lightTraces.push({
+                        x: [xPos], y: item.values, mode: 'markers',
+                        marker: { size: 10, color: '#ff7f0e', line: { width: 2, color: '#1f77b4' }, symbol: 'circle-open' },
+                        name: item.char, hoverinfo: 'y+name'
+                    });
+                    xPos += 1;
+                } else {
+                    const x = Array.from({length: item.values.length}, (_, i) => xPos + i*0.2);
+                    mainTraces.push({
+                        x: x, y: item.values, mode: 'lines+markers',
+                        line: { width: 2, color: '#1f77b4' }, marker: { size: 6, color: '#ff7f0e' },
+                        name: item.char, hoverinfo: 'y+name'
+                    });
+                    xPos += 1;
+                }
+            });
+            const traces = [...mainTraces, ...lightTraces];
+            const layout = {
+                title: { text: '声调曲线图（空心圆点表示轻声）', font: { size: 24 } },
+                yaxis: { title: '五度值', range: [0, 6], tickvals: [1, 2, 3, 4, 5], gridcolor: '#eee' },
+                xaxis: { tickvals: Array.from({length: xLabels.length}, (_,i) => i), ticktext: xLabels, tickangle: 0, showgrid: false },
+                margin: { t: 80, b: 100 }, plot_bgcolor: '#f8f9fa', showlegend: false
+            };
+            Plotly.newPlot('chart', traces, layout);
+        }
+    </script>
+</body>
+</html>
